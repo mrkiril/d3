@@ -1,0 +1,262 @@
+# d3
+
+<!-- 
+<script>
+
+    var context = d3.select("canvas").node().getContext("2d"),
+        path = d3.geoPath(d3.geoOrthographic(), context);
+
+    d3.json("https://unpkg.com/world-atlas@1/world/110m.json", function(error, world) {
+      if (error) throw error;
+      console.log(world)
+      context.beginPath();
+      path(topojson.mesh(world));
+      context.stroke();
+    });
+
+    
+
+
+</script> 
+-->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WORLD</title>
+    <!-- <script src="https://d3js.org/d3.v4.min.js"></script> -->
+    <!-- <script src="https://d3js.org/d3.v5.min.js"></script> -->
+    <script src="d3/d3_v4.js"></script>
+    <!-- <script src="https://d3js.org/d3-queue.v3.min.js"></script> -->
+    <script src="topojson_client.js"></script>
+    <style type="text/css">
+        svg {
+            background: #ffffff;
+        }
+        .country {
+            fill: #cccccc;
+            stroke: #333;
+            stroke-width: 0.5;
+        }
+        .selected{
+            fill: yellow;
+        }
+    </style>
+</head>
+<body>
+    <input id="input1" type="file" accept="*.csv"/>
+    <input id="input2" type="file" accept="application/JSON"/>
+    <button id="buttonStart" type="button">Click Me!</button>
+    <div id="map"></div>
+    <div id="info"></div>
+    
+<script>
+var margin = {top: 50, left: 50, right: 50, bottom: 50}
+var height = 1000 - margin.top - margin.bottom
+var width = 1500 - margin.left - margin.right
+
+var svg = d3.select("#map")
+    .append("svg")
+    .attr("height", height + margin.top + margin.bottom)
+    .attr("width", width + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate("+ margin.left+","+margin.top+")")
+
+
+var projection = d3.geoMercator()
+    .translate( [width / 2, height / 2] )
+    // .scale(100)
+
+var path = d3.geoPath().projection(projection)
+buttonStart.onclick = RenderFoo
+
+// const myPromise = new Promise(function(resolve, reject) {
+  
+//   // Здесь будет код
+//   var codeIsFine = true
+//   if (codeIsFine) {
+//     resolve('fine')
+//   } else {
+//     reject('error')
+//   }
+// })
+// myPromise
+//   .then(function whenOk(response) {
+//     console.log(response)
+//     return response
+//   })
+//   .catch(function notOk(err) {
+//     console.error(err)
+// })
+
+
+
+
+function RenderFoo()
+{
+    var GetFileDataById = async function(id)
+    {
+        //  приймає id тега де знаходиться файл з данними
+        //  повертає ПРОМІС текста зчитаного файла
+        if(! document.getElementById(id).files.length ) throw SyntaxError("0 file selected")
+        const readUploadedFileAsText = async function(inputFile)
+        {
+            const temporaryFileReader = new FileReader();
+            return new Promise(function(resolve, reject)
+            {
+                temporaryFileReader.onerror = function()
+                {
+                    temporaryFileReader.abort();
+                    reject(new DOMException("Problem parsing input file."));
+                };
+
+                temporaryFileReader.onload = function(event)
+                {
+                    resolve(event.target.result);
+                };
+                temporaryFileReader.readAsText(inputFile);
+            });
+        };
+        var foo = (data) => data
+        const handleUpload = async () => {
+            const file = document.getElementById(id).files[0]
+            console.log("TYPE: ", file.type)
+            try 
+            {
+                let a = readUploadedFileAsText(file)
+                console.log(a)
+                return await a
+            } 
+            catch (e) 
+            {
+                console.warn(e.message)
+            }
+        }
+        return handleUpload()
+    }   
+
+    var GetJSONbyHTTP = function(link)
+    {
+        return new Promise(function(resolve, reject)
+        {
+            d3.json(link, function(data){
+                resolve(data);
+            })
+        })
+    }
+
+    var GetCSVbyHTTP = function(link)
+    {
+        return new Promise(function(resolve, reject)
+        {
+            d3.csv(link, function(data){
+                resolve(data);
+            })
+        })
+    }
+
+
+    var GetCSVbyFile = async function(id)
+    {
+        //  Ця функція отримує проміс текста CSV 
+        //  І парсить його.
+        //  Вертає проміс JSON об'єкта
+        let retData
+        await GetFileDataById(id).then(async function (f) 
+        {
+            console.log(f)
+            retData = await d3.csvParse(f)
+        })
+        return retData
+    }
+
+
+    var GetJSONbyFile = async function(id)
+    {
+        //  Ця функція отримує проміс текста JSON 
+        //  І парсить його.
+        //  Вертає проміс JSON об'єкта
+        let retData
+        await GetFileDataById(id).then(async function (f) 
+        {
+            console.log(f)
+            retData = await JSON.parse(f)
+        })
+        return retData
+    }
+
+    Promise.all([
+        // GetJSONbyHTTP('https://unpkg.com/world-atlas@1/world/110m.json'),
+        GetCSVbyFile("input1"),
+        GetJSONbyFile("input2"),
+    ])
+    .then(ready)
+
+    
+    
+}
+
+
+async function ready(results){
+    var data = results[1]
+    var capitals = results[0]
+    console.log(data)
+    console.log(capitals)
+    var countries = topojson.feature(data, data.objects.countries).features
+    console.log( countries )
+
+
+    svg.selectAll(".country")
+        .data(countries)
+        .enter().append("path")
+        .attr("class", "country")
+        .attr("d", path )
+        .on("mouseover", function(d){
+            d3.select(this).classed("selected", true)
+        })
+        .on("mouseout", function(d){
+            d3.select(this).classed("selected", false)
+        })
+
+    svg.selectAll(".city-circles")
+        .data(capitals)
+        .enter().append("circle")
+        .attr("r", 2)
+        .attr("cx", 10)
+        .attr("cy", 10)
+}
+
+// d3.select("body")
+//     .append("input")
+//     .attr("type", "file")
+//     .attr("accept", ".csv")
+//     .style("margin", "5px")
+//     .on("change", function() {
+//         var file = d3.event.target.files[0];
+//         if (file) {
+//         var reader = new FileReader();
+//         reader.onloadend = function(evt) {
+//             var dataUrl = evt.target.result;
+//             // The following call results in an "Access denied" error in IE.
+//             console.log( dataUrl )
+//             d3.csv(dataUrl, function(data_csv)
+//             {
+                
+//             })
+//         };
+//        reader.readAsDataURL(file);
+//       }
+//    })
+
+</script> 
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
